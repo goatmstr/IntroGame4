@@ -1,4 +1,4 @@
 ﻿  Entity.cpp
-C:\Users\hbpan\Documents\code\IntroGame\IntroGame4\SDLProject\Entity.h(107,58): warning C4244: 'return': conversion from 'const float' to 'const int', possible loss of data
 C:\Users\hbpan\Documents\code\IntroGame\IntroGame4\SDLProject\Entity.h(108,58): warning C4244: 'return': conversion from 'const float' to 'const int', possible loss of data
+C:\Users\hbpan\Documents\code\IntroGame\IntroGame4\SDLProject\Entity.h(109,58): warning C4244: 'return': conversion from 'const float' to 'const int', possible loss of data
   SDLProject.vcxproj -> C:\Users\hbpan\Documents\code\IntroGame\IntroGame4\SDLProject\Debug\SDLProject.exe

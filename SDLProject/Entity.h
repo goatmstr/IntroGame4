@@ -1,6 +1,6 @@
 enum EntityType { PLATFORM, PLAYER, ENEMY };
 enum AIType { WALKER, GUARD, PATROLLER };
-enum AIState { WALKING, IDLE, ATTACKING, PATROLLING, JUMPING};
+enum AIState { WALKING, IDLE, ATTACKING, PATROLLING, JUMPING, DEAD};
 
 class Entity
 {
@@ -92,9 +92,10 @@ public:
     void ai_guard(float ticks, Entity* player);
 
     void activate() { m_is_active = true; };
-    void deactivate() { m_is_active = false; };
+    void deactivate() { m_is_active = false; }
 
     // ————— GETTERS ————— //
+    bool       const get_entity_status()      const { return m_is_active; };
     EntityType const get_entity_type()    const { return m_entity_type; };
     AIType     const get_ai_type()        const { return m_ai_type; };
     AIState    const get_ai_state()       const { return m_ai_state; };

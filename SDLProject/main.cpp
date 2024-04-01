@@ -212,10 +212,10 @@ void initialise()
     g_game_state.enemies[0].set_ai_type(GUARD);
     g_game_state.enemies[0].set_ai_state(JUMPING);
     g_game_state.enemies[0].m_texture_id = enemy_texture_id;
-    g_game_state.enemies[0].set_position(glm::vec3(2.5f, 0.0f, 0.0f));
+    g_game_state.enemies[0].set_position(glm::vec3(2.5f, 5.0f, 0.0f));
     g_game_state.enemies[0].set_movement(glm::vec3(0.0f));
     g_game_state.enemies[0].set_speed(0.5f);
-    g_game_state.enemies[0].set_jumping_power(0.15f);
+    g_game_state.enemies[0].set_jumping_power(5.0f);
     g_game_state.enemies[0].set_acceleration(glm::vec3(0.0f, -9.81f, 0.0f));
     g_game_state.enemies[1].set_entity_type(ENEMY);
     g_game_state.enemies[1].set_ai_type(WALKER);
@@ -332,8 +332,10 @@ void update()
 
     while (delta_time >= FIXED_TIMESTEP) {
         g_game_state.player->update(ticks, FIXED_TIMESTEP, g_game_state.player, g_game_state.platforms, PLATFORM_COUNT);
-        g_game_state.player->update(ticks, FIXED_TIMESTEP, g_game_state.player, g_game_state.enemies, ENEMY_COUNT);
-
+        for (int i = 0; i < ENEMY_COUNT; i++) {
+            g_game_state.player->check_collision_y(&g_game_state.enemies[i], 1);
+            g_game_state.player->check_collision_x(&g_game_state.enemies[i], 1);
+        }
         for (int i = 0; i < ENEMY_COUNT; i++) g_game_state.enemies[i].update(ticks, FIXED_TIMESTEP, g_game_state.player, g_game_state.platforms, PLATFORM_COUNT);
 
         delta_time -= FIXED_TIMESTEP;
@@ -346,10 +348,15 @@ void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    g_game_state.player->render(&g_shader_program);
-
+    if (g_game_state.player->get_entity_status()) {
+        g_game_state.player->render(&g_shader_program);
+    }
     for (int i = 0; i < PLATFORM_COUNT; i++) g_game_state.platforms[i].render(&g_shader_program);
-    for (int i = 0; i < ENEMY_COUNT; i++)    g_game_state.enemies[i].render(&g_shader_program);
+    for (int i = 0; i < ENEMY_COUNT; i++) {
+        if (g_game_state.enemies[i].get_entity_status()) {
+            g_game_state.enemies[i].render(&g_shader_program);
+        }
+    }
 
     SDL_GL_SwapWindow(g_display_window);
 }

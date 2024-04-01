@@ -122,8 +122,14 @@ void Entity::ai_guard(float ticks, Entity* player)
         break;
 
     case JUMPING:
-        m_is_jumping = true;
-        if (glm::distance(m_position, player->get_position()) < 1.0f) m_ai_state = WALKING;
+        if (glm::distance(m_position, player->get_position()) < 2.0f) {
+            if (m_position.x > player->get_position().x) {
+                m_movement = glm::vec3(-1.0f, 0.0f, 0.0f);
+            }
+            else {
+                m_movement = glm::vec3(1.0f, 0.0f, 0.0f);
+            }
+        }
         break;
 
     case ATTACKING:
@@ -143,6 +149,7 @@ void Entity::update(float ticks, float delta_time, Entity* player, Entity* colli
     m_collided_bottom = false;
     m_collided_left = false;
     m_collided_right = false;
+
     
     if (m_entity_type == ENEMY) ai_activate(ticks, player);
 
@@ -166,7 +173,7 @@ void Entity::update(float ticks, float delta_time, Entity* player, Entity* colli
             }
         }
     }
-
+   
     // ––––– GRAVITY ––––– //
     m_velocity.x = m_movement.x * m_speed;
     m_velocity += m_acceleration * delta_time;
@@ -181,6 +188,7 @@ void Entity::update(float ticks, float delta_time, Entity* player, Entity* colli
     if (m_is_jumping)
     {
             m_is_jumping = false;
+            
        
         // STEP 2: The player now acquires an upward velocity
         m_velocity.y += m_jumping_power;
@@ -205,11 +213,20 @@ void const Entity::check_collision_y(Entity* collidable_entities, int collidable
                 m_position.y -= y_overlap;
                 m_velocity.y = 0;
                 m_collided_top = true;
+                if (m_entity_type == PLAYER && collidable_entity->m_entity_type == ENEMY) {
+                    deactivate();
+                }
             }
             else if (m_velocity.y < 0) {
                 m_position.y += y_overlap;
                 m_velocity.y = 0;
                 m_collided_bottom = true;
+                if (m_entity_type == ENEMY && m_ai_state == JUMPING) {
+                    m_velocity.y += m_jumping_power;
+                }
+                if (collidable_entity->m_entity_type == ENEMY) {
+                    collidable_entity->deactivate();
+                }
             }
         }
     }
@@ -225,6 +242,9 @@ void const Entity::check_collision_x(Entity* collidable_entities, int collidable
         {
             float x_distance = fabs(m_position.x - collidable_entity->get_position().x);
             float x_overlap = fabs(x_distance - (m_width / 2.0f) - (collidable_entity->get_width() / 2.0f));
+            if (collidable_entity->get_entity_type() == ENEMY) {
+                deactivate();
+            }
             if (m_velocity.x > 0) {
                 m_position.x -= x_overlap;
                 m_velocity.x = 0;
