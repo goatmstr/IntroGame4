@@ -3,7 +3,7 @@
 #define LOG(argument) std::cout << argument << '\n'
 #define GL_GLEXT_PROTOTYPES 1
 #define FIXED_TIMESTEP 0.0166666f
-#define PLATFORM_COUNT 11
+#define PLATFORM_COUNT 15
 #define ENEMY_COUNT 3
 
 #ifdef _WINDOWS
@@ -21,6 +21,7 @@
 #include <ctime>
 #include <vector>
 #include "Entity.h"
+#include "Map.h"
 
 // ––––– STRUCTS AND ENUMS ––––– //
 struct GameState
@@ -28,6 +29,8 @@ struct GameState
     Entity* player;
     Entity* platforms;
     Entity* enemies;
+
+    Map* map;
 
     Mix_Music* bgm;
     Mix_Chunk* jump_sfx;
@@ -37,9 +40,9 @@ struct GameState
 const int   WINDOW_WIDTH = 640,
 WINDOW_HEIGHT = 480;
 
-const float BG_RED = 0.1922f,
-BG_BLUE = 0.549f,
-BG_GREEN = 0.9059f,
+const float BG_RED = 0.2f,
+BG_BLUE = 0.78f,
+BG_GREEN = 0.95f,
 BG_OPACITY = 1.0f;
 
 const int   VIEWPORT_X = 0,
@@ -51,18 +54,29 @@ const char  V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
 F_SHADER_PATH[] = "shaders/fragment_textured.glsl";
 
 const float MILLISECONDS_IN_SECOND = 1000.0;
-const char  SPRITESHEET_FILEPATH[] = "assets/george_0.png",
-PLATFORM_FILEPATH[] = "assets/platformPack_tile027.png",
-ENEMY_FILEPATH[] = "assets/soph.png";
+const char  SPRITESHEET_FILEPATH[] = "assets/steve.png",
+FONT_FILEPATH[] = "assets/font1.png",
+PLATFORM_FILEPATH[] = "assets/grass.png",
+SPIDER_FILEPATH[] = "assets/spider.png",
+ZOMBIE_FILEPATH[] = "assets/zombie.png",
+SLIME_FILEPATH[] = "assets/slime.png";
 
 
-const char  BGM_FILEPATH[] = "assets/audio/dooblydoo.mp3",
-BOUNCING_SFX_FILEPATH[] = "assets/audio/bounce.wav";
+const char  BGM_FILEPATH[] = "assets/audio/sweden.mp3"; 
 const int   LOOP_FOREVER = -1;  // -1 means loop forever in Mix_PlayMusic; 0 means play once and loop zero times
 
 const int NUMBER_OF_TEXTURES = 1;
 const GLint LEVEL_OF_DETAIL = 0;
 const GLint TEXTURE_BORDER = 0;
+
+unsigned int LEVEL_1_DATA[] =
+{
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+    2, 2, 1, 1, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2
+};
 
 // BGM
 const int   CD_QUAL_FREQ = 44100,  // CD quality
@@ -120,13 +134,76 @@ GLuint load_texture(const char* filepath)
     return textureID;
 }
 
+const int FONTBANK_SIZE = 16;
+
+void DrawText(ShaderProgram* program, GLuint font_texture_id, std::string text, float screen_size, float spacing, glm::vec3 position)
+{
+    // Scale the size of the fontbank in the UV-plane
+    // We will use this for spacing and positioning
+    float width = 1.0f / FONTBANK_SIZE;
+    float height = 1.0f / FONTBANK_SIZE;
+
+    // Instead of having a single pair of arrays, we'll have a series of pairs—one for each character
+    // Don't forget to include <vector>!
+    std::vector<float> vertices;
+    std::vector<float> texture_coordinates;
+
+    // For every character...
+    for (int i = 0; i < text.size(); i++) {
+        // 1. Get their index in the spritesheet, as well as their offset (i.e. their position
+        //    relative to the whole sentence)
+        int spritesheet_index = (int)text[i];  // ascii value of character
+        float offset = (screen_size + spacing) * i;
+
+        // 2. Using the spritesheet index, we can calculate our U- and V-coordinates
+        float u_coordinate = (float)(spritesheet_index % FONTBANK_SIZE) / FONTBANK_SIZE;
+        float v_coordinate = (float)(spritesheet_index / FONTBANK_SIZE) / FONTBANK_SIZE;
+
+        // 3. Inset the current pair in both vectors
+        vertices.insert(vertices.end(), {
+            offset + (-0.5f * screen_size), 0.5f * screen_size,
+            offset + (-0.5f * screen_size), -0.5f * screen_size,
+            offset + (0.5f * screen_size), 0.5f * screen_size,
+            offset + (0.5f * screen_size), -0.5f * screen_size,
+            offset + (0.5f * screen_size), 0.5f * screen_size,
+            offset + (-0.5f * screen_size), -0.5f * screen_size,
+            });
+
+        texture_coordinates.insert(texture_coordinates.end(), {
+            u_coordinate, v_coordinate,
+            u_coordinate, v_coordinate + height,
+            u_coordinate + width, v_coordinate,
+            u_coordinate + width, v_coordinate + height,
+            u_coordinate + width, v_coordinate,
+            u_coordinate, v_coordinate + height,
+            });
+    }
+
+    // 4. And render all of them using the pairs
+    glm::mat4 model_matrix = glm::mat4(1.0f);
+    model_matrix = glm::translate(model_matrix, position);
+
+    program->SetModelMatrix(model_matrix);
+    glUseProgram(program->programID);
+
+    glVertexAttribPointer(program->positionAttribute, 2, GL_FLOAT, false, 0, vertices.data());
+    glEnableVertexAttribArray(program->positionAttribute);
+    glVertexAttribPointer(program->texCoordAttribute, 2, GL_FLOAT, false, 0, texture_coordinates.data());
+    glEnableVertexAttribArray(program->texCoordAttribute);
+
+    glBindTexture(GL_TEXTURE_2D, font_texture_id);
+    glDrawArrays(GL_TRIANGLES, 0, (int)(text.size() * 6));
+
+    glDisableVertexAttribArray(program->positionAttribute);
+    glDisableVertexAttribArray(program->texCoordAttribute);
+}
 
 void initialise()
 {
     // Initialising both the video AND audio subsystems
     // We did something similar when we talked about video game controllers
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-    g_display_window = SDL_CreateWindow("Hello, Audio!",
+    g_display_window = SDL_CreateWindow("Minecraft 2D",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH, WINDOW_HEIGHT,
         SDL_WINDOW_OPENGL);
@@ -160,20 +237,20 @@ void initialise()
     g_game_state.platforms = new Entity[PLATFORM_COUNT];
 
     g_game_state.platforms[PLATFORM_COUNT - 1].m_texture_id = platform_texture_id;
-    g_game_state.platforms[PLATFORM_COUNT - 1].set_position(glm::vec3(-1.5f, -2.35f, 0.0f));
+    g_game_state.platforms[PLATFORM_COUNT - 1].set_position(glm::vec3(-4.0f, -2.8f, 0.0f));
     g_game_state.platforms[PLATFORM_COUNT - 1].set_width(0.4f);
     g_game_state.platforms[PLATFORM_COUNT - 1].update(0.0f, 0.0f, NULL, NULL, 0);
 
     for (int i = 0; i < PLATFORM_COUNT - 2; i++)
     {
         g_game_state.platforms[i].m_texture_id = platform_texture_id;
-        g_game_state.platforms[i].set_position(glm::vec3(i - 1.0f, -3.0f, 0.0f));
+        g_game_state.platforms[i].set_position(glm::vec3(i - 5.0f, -3.5f, 0.0f));
         g_game_state.platforms[i].set_width(0.4f);
         g_game_state.platforms[i].update(0.0f, 0.0f, NULL, NULL, 0);
     }
 
     g_game_state.platforms[PLATFORM_COUNT - 2].m_texture_id = platform_texture_id;
-    g_game_state.platforms[PLATFORM_COUNT - 2].set_position(glm::vec3(2.5f, -2.5f, 0.0f));
+    g_game_state.platforms[PLATFORM_COUNT - 2].set_position(glm::vec3(2.0f, -2.8f, 0.0f));
     g_game_state.platforms[PLATFORM_COUNT - 2].set_width(0.4f);
     g_game_state.platforms[PLATFORM_COUNT - 2].update(0.0f, 0.0f, NULL, NULL, 0);
 
@@ -188,11 +265,9 @@ void initialise()
 
     // Walking
     g_game_state.player->m_walking[g_game_state.player->LEFT] = new int[4] { 1, 5, 9, 13 };
-    g_game_state.player->m_walking[g_game_state.player->RIGHT] = new int[4] { 3, 7, 11, 15 };
-    g_game_state.player->m_walking[g_game_state.player->UP] = new int[4] { 2, 6, 10, 14 };
-    g_game_state.player->m_walking[g_game_state.player->DOWN] = new int[4] { 0, 4, 8, 12 };
+    g_game_state.player->m_walking[g_game_state.player->RIGHT] = new int[4] { 2, 7, 11, 15};
 
-    g_game_state.player->m_animation_indices = g_game_state.player->m_walking[g_game_state.player->RIGHT];  // start George looking left
+    g_game_state.player->m_animation_indices = g_game_state.player->m_walking[g_game_state.player->RIGHT]; 
     g_game_state.player->m_animation_frames = 4;
     g_game_state.player->m_animation_index = 0;
     g_game_state.player->m_animation_time = 0.0f;
@@ -205,14 +280,16 @@ void initialise()
     g_game_state.player->set_jumping_power(4.0f);
 
     // ––––– ENEMIES ––––– //
-    GLuint enemy_texture_id = load_texture(ENEMY_FILEPATH);
-
+    GLuint spider_texture_id = load_texture(SPIDER_FILEPATH);
+    GLuint slime_texture_id = load_texture(SLIME_FILEPATH);
+    GLuint zombie_texture_id = load_texture(ZOMBIE_FILEPATH);
+    
     g_game_state.enemies = new Entity[ENEMY_COUNT];
     g_game_state.enemies[0].set_entity_type(ENEMY);
     g_game_state.enemies[0].set_ai_type(GUARD);
     g_game_state.enemies[0].set_ai_state(JUMPING);
-    g_game_state.enemies[0].m_texture_id = enemy_texture_id;
-    g_game_state.enemies[0].set_position(glm::vec3(2.5f, 5.0f, 0.0f));
+    g_game_state.enemies[0].m_texture_id = slime_texture_id;
+    g_game_state.enemies[0].set_position(glm::vec3(2.0f, 5.0f, 0.0f));
     g_game_state.enemies[0].set_movement(glm::vec3(0.0f));
     g_game_state.enemies[0].set_speed(0.5f);
     g_game_state.enemies[0].set_jumping_power(5.0f);
@@ -220,7 +297,7 @@ void initialise()
     g_game_state.enemies[1].set_entity_type(ENEMY);
     g_game_state.enemies[1].set_ai_type(WALKER);
     g_game_state.enemies[1].set_ai_state(WALKING);
-    g_game_state.enemies[1].m_texture_id = enemy_texture_id;
+    g_game_state.enemies[1].m_texture_id = zombie_texture_id;
     g_game_state.enemies[1].set_position(glm::vec3(2.0f, 0.0f, 0.0f));
     g_game_state.enemies[1].set_movement(glm::vec3(0.0f));
     g_game_state.enemies[1].set_speed(0.5f);
@@ -228,7 +305,7 @@ void initialise()
     g_game_state.enemies[2].set_entity_type(ENEMY);
     g_game_state.enemies[2].set_ai_type(GUARD);
     g_game_state.enemies[2].set_ai_state(PATROLLING);
-    g_game_state.enemies[2].m_texture_id = enemy_texture_id;
+    g_game_state.enemies[2].m_texture_id = spider_texture_id;
     g_game_state.enemies[2].set_position(glm::vec3(4.0f, 0.0f, 0.0f));
     g_game_state.enemies[2].set_movement(glm::vec3(0.0f));
     g_game_state.enemies[2].set_speed(0.5f);
@@ -239,13 +316,12 @@ void initialise()
 
     g_game_state.bgm = Mix_LoadMUS(BGM_FILEPATH);
     Mix_PlayMusic(g_game_state.bgm, -1);
-    Mix_VolumeMusic(MIX_MAX_VOLUME / 4.0f);
-
-    g_game_state.jump_sfx = Mix_LoadWAV(BOUNCING_SFX_FILEPATH);
+    Mix_VolumeMusic(MIX_MAX_VOLUME / 1.0f);
 
     // ––––– GENERAL ––––– //
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
 }
 
 void process_input()
@@ -347,7 +423,6 @@ void update()
 void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
-
     if (g_game_state.player->get_entity_status()) {
         g_game_state.player->render(&g_shader_program);
     }
@@ -356,6 +431,21 @@ void render()
         if (g_game_state.enemies[i].get_entity_status()) {
             g_game_state.enemies[i].render(&g_shader_program);
         }
+    }
+    GLuint font_texture_id = load_texture(FONT_FILEPATH);
+    if (!g_game_state.player->get_entity_status()) {
+        std::string text = "YOU LOSE!";
+        DrawText(&g_shader_program, font_texture_id, text, 0.5f, 0.05f, glm::vec3(-2.0f, 0.0f, 1.0f));
+    }
+    int enemy_dead = 0;
+    for (int i = 0; i < ENEMY_COUNT; i++) {
+        if (!g_game_state.enemies[i].get_entity_status()) {
+            enemy_dead++;
+        }
+    }
+    if (enemy_dead == ENEMY_COUNT) {
+        std::string text = "YOU WIN!";
+        DrawText(&g_shader_program, font_texture_id, text, 0.5f, 0.05f, glm::vec3(-2.0f, 0.0f, 1.0f));
     }
 
     SDL_GL_SwapWindow(g_display_window);

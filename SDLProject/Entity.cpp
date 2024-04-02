@@ -150,7 +150,7 @@ void Entity::update(float ticks, float delta_time, Entity* player, Entity* colli
     m_collided_left = false;
     m_collided_right = false;
 
-    
+
     if (m_entity_type == ENEMY) ai_activate(ticks, player);
 
     // ––––– ANIMATION ––––– //

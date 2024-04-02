@@ -42,12 +42,10 @@ public:
         DOWN = 3;
 
     // ————— ANIMATION ————— //
-    int** m_walking = new int* [4]
+    int** m_walking = new int* [2]
     {
         m_animation_left,
             m_animation_right,
-            m_animation_up,
-            m_animation_down
     };
 
     int m_animation_frames = 0,
